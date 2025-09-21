@@ -1,0 +1,130 @@
+# Endless Runner — Unity (C#)
+
+Project: **Phase Runner** — endless runner with a twist (Phase Shift). Now extended with **Unity Input System support** + **Swipe Controls for mobile**.
+
+---
+
+## Input System Setup
+1. In Unity, install **Input System** package via Package Manager.
+2. Edit → Project Settings → Player → Active Input Handling → **Both**.
+3. Create a new `InputActions` asset (e.g., `RunnerControls.inputactions`).
+4. Add Action Map: `Gameplay` with actions:
+   - **Jump** → Binding: Keyboard[Space], Touch/SwipeUp, Gamepad South Button.
+   - **Slide** → Binding: Keyboard[DownArrow], Touch/SwipeDown, Gamepad East Button.
+   - **Phase** → Binding: Keyboard[LeftShift], Touch/SwipeLeft/SwipeRight, Gamepad West Button.
+
+Generate the C# class (click **Generate C# Class** in inspector).
+
+---
+
+## File: PlayerInputHandler.cs
+```csharp
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class PlayerInputHandler : MonoBehaviour
+{
+    private RunnerControls controls;
+    private PlayerController player;
+
+    private Vector2 swipeStart;
+    private bool swiping = false;
+    private float minSwipeDistance = 50f; // pixels
+
+    void Awake()
+    {
+        controls = new RunnerControls();
+        player = GetComponent<PlayerController>();
+    }
+
+    void OnEnable()
+    {
+        controls.Gameplay.Enable();
+        controls.Gameplay.Jump.performed += ctx => player.Jump();
+        controls.Gameplay.Slide.performed += ctx => player.SlideStart();
+        controls.Gameplay.Phase.performed += ctx => player.TryPhase();
+    }
+
+    void OnDisable()
+    {
+        controls.Gameplay.Disable();
+    }
+
+    void Update()
+    {
+        HandleSwipeInput();
+    }
+
+    void HandleSwipeInput()
+    {
+        if (Touchscreen.current == null || Touchscreen.current.touches.Count == 0)
+            return;
+
+        var touch = Touchscreen.current.primaryTouch;
+
+        if (touch.press.isPressed)
+        {
+            if (!swiping)
+            {
+                swipeStart = touch.position.ReadValue();
+                swiping = true;
+            }
+        }
+        else if (swiping)
+        {
+            Vector2 swipeEnd = touch.position.ReadValue();
+            Vector2 delta = swipeEnd - swipeStart;
+
+            if (delta.magnitude >= minSwipeDistance)
+            {
+                if (Mathf.Abs(delta.x) > Mathf.Abs(delta.y))
+                {
+                    // Horizontal swipe
+                    player.TryPhase();
+                }
+                else
+                {
+                    if (delta.y > 0)
+                        player.Jump();
+                    else
+                        player.SlideStart();
+                }
+            }
+            swiping = false;
+        }
+    }
+}
+```
+
+---
+
+## Changes in PlayerController.cs
+- Remove direct `Input.GetKeyDown` checks from `Update()`.
+- All input is now triggered by **PlayerInputHandler**.
+
+Example snippet to remove:
+```csharp
+if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.UpArrow)) Jump();
+if (Input.GetKeyDown(KeyCode.DownArrow)) SlideStart();
+if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.X)) TryPhase();
+```
+
+---
+
+## Mobile Controls
+- Now supports **Swipe Gestures**:
+  - **Swipe Up** → Jump
+  - **Swipe Down** → Slide
+  - **Swipe Left/Right** → Phase Shift
+- Input System automatically handles touch + keyboard + gamepad together.
+
+---
+
+## Testing
+- Run in Editor: use Space/Arrow/Shift keys.
+- On Android/iOS: swipe on screen.
+- Gamepad: A = Jump, B = Slide, X = Phase.
+
+---
+
+With this setup, the game now has **unified input** across keyboard, mobile swipes, and controllers. Perfect for publishing on Android/iOS with intuitive swipe gestures.
